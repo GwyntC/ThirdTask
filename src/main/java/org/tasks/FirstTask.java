@@ -1,41 +1,52 @@
 package org.tasks;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import org.filter.GenericExtFilter;
 import org.models.Fine;
 import org.models.Fines;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.math.BigDecimal;
-import java.util.*;
-import java.util.concurrent.*;
+import java.text.DecimalFormat;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Scanner;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class FirstTask {//maybe try big decimal
-    private static Map<String, Float> fineMap = new HashMap<>();
+public class FirstTask {
+    //change map to bigDecimal for correct output
+    private static Map<String, BigDecimal> fineMap = new HashMap<>();
 
     public static void jsonFilesToXml(String folderPath, int threadsNumber) {
+        //filter for json
         GenericExtFilter filter = new GenericExtFilter("json");
         File folder = new File(folderPath);
         if (folder.listFiles() == null) {
             throw new IllegalArgumentException("Current directory contains no files!");
-        } else if (folderPath == null) {
-            throw new IllegalArgumentException("Invalid path,input path was null!");
         } else if (!folder.isDirectory()) {
             throw new IllegalArgumentException("Directory does not exists!");
         } else if (Objects.requireNonNull(folder.list(filter)).length == 0) {
             throw new IllegalArgumentException("Provided folder contains no .json files!");
         }
-
-        Map<String, Float> map = null;
+        Map<String, BigDecimal> map;
         map = readJson(folderPath, threadsNumber);
         jacksonAnnotation2Xml(map);
-        System.out.println("It is succeeded!");
     }
 
-    private static void jacksonAnnotation2Xml(Map<String, Float> map) {
+    //xmlMapper
+    private static void jacksonAnnotation2Xml(Map<String, BigDecimal> map) {
         XmlMapper xmlMapper = new XmlMapper();
         xmlMapper.enable(SerializationFeature.INDENT_OUTPUT);
         try {
@@ -45,46 +56,47 @@ public class FirstTask {//maybe try big decimal
         }
     }
 
-    private static Map<String, Float> finalMap;
+    //field for big decimal format settings
+    private static final DecimalFormat df = new DecimalFormat("0.00");
 
-    public static Map<String, Float> readJson(String folderPath, int threadsNumber) {
-//
+    //for method folderpath and number of threads must be provided
+    public static Map<String, BigDecimal> readJson(String folderPath, int threadsNumber) {
         File dir = new File(folderPath);
         //getting files in directory
         File[] listOfFiles = dir.listFiles();
         assert listOfFiles != null;
+        //service for creation fixed numbers of threads
         ExecutorService executors = Executors.newFixedThreadPool(threadsNumber);
+        //lock for non-threadsafe operations
         ReentrantLock lock = new ReentrantLock();
-        //long timeStart = System.currentTimeMillis();
         for (File file : listOfFiles) {
+            //one future to read single file from file and put into shared map
             CompletableFuture.supplyAsync(() -> file, executors)
                     .thenAccept(e -> {
+                        //using scanner for careful memory processing
+                        //one json object-one block
                         try (Scanner scanner = new Scanner(new FileReader(file)).useDelimiter("\\[*\\{")) {
                             ObjectMapper mapper = new ObjectMapper();
+                            //take only needed properties
                             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
                             while (scanner.hasNext()) {
                                 String current = "{" + scanner.next();
-                                // JsonNode node = mapper.readTree(current);
+                                //map string to Model
                                 Fine fine = mapper.readValue(current, Fine.class);
+                                //locking unsafe put and get
                                 lock.lock();
-
                                 if (!fineMap.containsKey(fine.getType())) {
                                     fineMap.put(fine.getType(), fine.getFineAmount());
                                 } else {
-                                    fineMap.put(fine.getType(), fineMap.get(fine.getType()) + fine.getFineAmount());
+                                    fineMap.put(fine.getType(), fineMap.get(fine.getType()).add(fine.getFineAmount()));
                                 }
                                 lock.unlock();
                             }
 
-                        } catch (FileNotFoundException ex) {
-                            throw new RuntimeException(ex);
-                        } catch (JsonMappingException ex) {
-                            throw new RuntimeException(ex);
-                        } catch (JsonProcessingException ex) {
+                        } catch (FileNotFoundException | JsonProcessingException ex) {
                             throw new RuntimeException(ex);
                         }
                     });
-
         }
         executors.shutdown();
         try {
@@ -92,16 +104,11 @@ public class FirstTask {//maybe try big decimal
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        for (var entry : fineMap.entrySet()) {
-            System.out.println(entry.getKey() + " " + new BigDecimal(entry.getValue()).toPlainString());
-        }
-        //long estimatedTime = System.currentTimeMillis() - timeStart;
-        //sorting our map reversed order(biggest on top)
-        //System.out.println(estimatedTime + " ms");
         return fineMap;
     }
 
-    private static Fines getFines(Map<String, Float> map) {
+    // convert map to Fines object
+    private static Fines getFines(Map<String, BigDecimal> map) {
         Fines fines = new Fines();
         Fine fine;
         for (var entry : map.entrySet()) {

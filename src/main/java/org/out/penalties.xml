@@ -1,15 +1,15 @@
 <penalty>
   <fines>
     <fine>
-      <fine_amount>1.53178419E9</fine_amount>
+      <fine_amount>9626275620.00</fine_amount>
       <type>WRONG TRAFFIC</type>
     </fine>
     <fine>
-      <fine_amount>1.09941734E9</fine_amount>
+      <fine_amount>6891074379.53</fine_amount>
       <type>SPEEDING</type>
     </fine>
     <fine>
-      <fine_amount>46800.0</fine_amount>
+      <fine_amount>292500.00</fine_amount>
       <type>DRINK DRIVING</type>
     </fine>
   </fines>

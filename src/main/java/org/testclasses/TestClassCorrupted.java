@@ -2,13 +2,13 @@ package org.testclasses;
 
 import java.time.Instant;
 
-public class TestClass {
+public class TestClassCorrupted {
     private String stringProperty;
     @Property(name = "numberProperty")
     private int number;
-    @Property(format = "yyyy.MM.dd HH:mm")
+    @Property(format = "dd.MM.yyyy HH:mm")
     private Instant timeProperty;
-    public TestClass(){
+    public TestClassCorrupted(){
 
     }
     public String getStringProperty() {
